@@ -1,15 +1,11 @@
-import { NextResponse } from "next/server";
-import { supabase } from "@/utils/supabase";
+import { getSupabase } from "@/utils/supabase";
 
 export async function GET() {
-  const { data, error } = await supabase.from("orders").select("*");
+  const supabase = getSupabase();
 
-  if (error) {
-    return NextResponse.json({
-      success: false,
-      error: error.message
-    });
-  }
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*");
 
-  return NextResponse.json(data);
+  return Response.json({ data, error });
 }
