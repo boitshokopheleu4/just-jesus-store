@@ -1,33 +1,28 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/utils/supabase";
+import { getSupabase } from "@/utils/supabase";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.formData();
+    const supabase = getSupabase();
 
-    const orderId = body.get("item_name") as string;
-    const paymentStatus = body.get("payment_status") as string;
+    const formData = await req.formData();
+    const data: any = Object.fromEntries(formData);
 
-    console.log("PAYFAST WEBHOOK:", orderId, paymentStatus);
+    // Example: update order status from PayFast callback
+    const orderId = data.m_payment_id;
 
-    if (paymentStatus === "COMPLETE") {
-      const { error } = await supabase
-        .from("orders")
-        .update({ status: "Paid" })
-        .eq("order_id", orderId);
+    const { error } = await supabase
+      .from("orders")
+      .update({ status: "paid" })
+      .eq("id", orderId);
 
-      if (error) {
-        console.error(error);
-      }
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     return NextResponse.json({ success: true });
 
   } catch (err) {
-    console.error(err);
-
-    return NextResponse.json({
-      success: false
-    });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

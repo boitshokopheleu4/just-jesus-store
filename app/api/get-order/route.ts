@@ -1,32 +1,30 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/utils/supabase";
+import { getSupabase } from "@/utils/supabase";
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const orderId = searchParams.get("orderId");
+  try {
+    const supabase = getSupabase();
 
-  if (!orderId) {
-    return NextResponse.json({
-      success: false,
-      error: "No order ID provided"
-    });
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "Missing order id" }, { status: 400 });
+    }
+
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ data });
+
+  } catch (err) {
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
-
-  const { data, error } = await supabase
-    .from("orders")
-    .select("*")
-    .eq("order_id", orderId)
-    .single();
-
-  if (error) {
-    return NextResponse.json({
-      success: false,
-      error: error.message
-    });
-  }
-
-  return NextResponse.json({
-    success: true,
-    order: data
-  });
 }
