@@ -3,23 +3,22 @@ import { supabase } from "@/utils/supabase";
 import crypto from "crypto";
 
 function generateSignature(data: Record<string, string>, passphrase = "") {
-  let pfOutput = "";
+  const filtered = Object.keys(data)
+    .filter((key) =>
+      data[key] !== "" &&
+      key !== "signature"
+    )
+    .sort()
+    .map((key) => {
+      return `${key}=${encodeURIComponent(data[key].trim()).replace(/%20/g, "+")}`;
+    })
+    .join("&");
 
-  const keys = Object.keys(data).sort();
+  const stringToHash = passphrase
+    ? `${filtered}&passphrase=${encodeURIComponent(passphrase).replace(/%20/g, "+")}`
+    : filtered;
 
-  for (const key of keys) {
-    if (key !== "signature") {
-      pfOutput += `${key}=${encodeURIComponent(data[key])}&`;
-    }
-  }
-
-  if (passphrase) {
-    pfOutput += `passphrase=${encodeURIComponent(passphrase)}`;
-  } else {
-    pfOutput = pfOutput.slice(0, -1);
-  }
-
-  return crypto.createHash("md5").update(pfOutput).digest("hex");
+  return crypto.createHash("md5").update(stringToHash).digest("hex");
 }
 
 export async function POST(req: Request) {
@@ -32,10 +31,15 @@ export async function POST(req: Request) {
     console.log("📦 RAW DATA:", params);
 
     const receivedSignature = params.signature;
-    const expectedSignature = generateSignature(params, "");
+   const expectedSignature = generateSignature(params, );
 
-    console.log("🔐 RECEIVED:", receivedSignature);
-    console.log("🔐 EXPECTED:", expectedSignature);
+console.log("🔐 RECEIVED:", receivedSignature);
+console.log("🔐 EXPECTED:", expectedSignature);
+
+if (receivedSignature !== expectedSignature) {
+  console.log("❌ INVALID SIGNATURE");
+  return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
+}
 
     // 🚨 SECURITY CHECK
    if (process.env.NODE_ENV === "production") {
