@@ -31,13 +31,13 @@ export default function CheckoutPage() {
         return;
       }
 
-      const order = data.data;
+      const order = data?.data;
 
-      if (!order?.order_id) {
-        console.error("❌ Missing order_id:", order);
-        alert("Order creation failed");
-        return;
-      }
+if (!order?.order_id) {
+  console.error("FULL RESPONSE:", data);
+  alert("Missing order_id");
+  return;
+}
 
       // STEP 2: PayFast request (THIS is where your line goes)
       const payRes = await fetch("/api/payfast", {
