@@ -1,17 +1,28 @@
 import { NextResponse } from "next/server";
-import { getSupabase } from "@/utils/supabase";
+import { supabase } from "@/utils/supabase";
 
-export async function POST(req: Request) {
+export async function GET() {
   try {
-    const supabase = getSupabase();
-
     const { data, error } = await supabase
       .from("orders")
-      .select("*");
+      .select("*")
+      .order("created_at", { ascending: false });
 
-    return NextResponse.json({ data, error });
+    if (error) {
+      console.error("SUPABASE ERROR:", error);
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      );
+    }
 
-  } catch (err) {
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json({ data });
+
+  } catch (err: any) {
+    console.error("SERVER ERROR:", err);
+    return NextResponse.json(
+      { error: err.message || "Server error" },
+      { status: 500 }
+    );
   }
 }

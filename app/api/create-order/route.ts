@@ -1,25 +1,39 @@
 import { NextResponse } from "next/server";
-import { getSupabase } from "@/utils/supabase";
+import { supabase } from "@/utils/supabase";
 
 export async function POST(req: Request) {
   try {
-    const supabase = getSupabase();
-
     const body = await req.json();
+
+    const orderId = crypto.randomUUID();
 
     const { data, error } = await supabase
       .from("orders")
-      .insert([body])
+      .insert({
+        id: orderId,
+        order_id: orderId,
+        total: body.total ?? 0,
+        items: body.items ?? [],
+        status: "pending"
+      })
       .select()
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      console.error("SUPABASE ERROR:", error);
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      );
     }
 
     return NextResponse.json({ data });
 
-  } catch (err) {
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  } catch (err: any) {
+    console.error("SERVER ERROR:", err);
+    return NextResponse.json(
+      { error: err.message || "Server error" },
+      { status: 500 }
+    );
   }
 }
