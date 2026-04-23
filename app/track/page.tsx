@@ -1,47 +1,39 @@
 "use client";
-
 import { useState } from "react";
 
-export default function TrackPage() {
+export default function TrackOrder() {
   const [orderId, setOrderId] = useState("");
   const [order, setOrder] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
 
-  const trackOrder = async () => {
-    setLoading(true);
+  const track = async () => {
+    const res = await fetch("/api/track-order", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ orderId })
+    });
 
-    const res = await fetch(`/api/get-order?orderId=${orderId}`);
     const data = await res.json();
-
     setOrder(data.order);
-    setLoading(false);
   };
 
   return (
-    <div style={{ textAlign: "center", padding: 50 }}>
-      <h1>Track Your Order</h1>
+    <div>
+      <h1>Track Order</h1>
 
       <input
         placeholder="Enter Order ID"
         value={orderId}
         onChange={(e) => setOrderId(e.target.value)}
-        style={{ padding: 10, marginTop: 20 }}
       />
 
-      <br />
-
-      <button onClick={trackOrder} style={{ marginTop: 20 }}>
-        Track Order
-      </button>
-
-      {loading && <p>Loading...</p>}
+      <button onClick={track}>Track</button>
 
       {order && (
-        <div style={{ marginTop: 30 }}>
-          <h3>Order Found</h3>
-          <p>Order ID: {order.order_id}</p>
+        <div>
           <p>Status: {order.status}</p>
-          <p>Total: R{order.total}</p>
+          <p>Total: {order.total}</p>
         </div>
       )}
     </div>
