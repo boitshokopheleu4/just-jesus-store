@@ -1,33 +1,69 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/utils/supabase";
+import crypto from "crypto";
+
+function generateSignature(data: Record<string, string>, passphrase = "") {
+  let pfOutput = "";
+
+  const keys = Object.keys(data).sort();
+
+  for (const key of keys) {
+    if (key !== "signature") {
+      pfOutput += `${key}=${encodeURIComponent(data[key])}&`;
+    }
+  }
+
+  if (passphrase) {
+    pfOutput += `passphrase=${encodeURIComponent(passphrase)}`;
+  } else {
+    pfOutput = pfOutput.slice(0, -1);
+  }
+
+  return crypto.createHash("md5").update(pfOutput).digest("hex");
+}
 
 export async function POST(req: Request) {
   try {
     console.log("🔥 WEBHOOK HIT");
 
     const text = await req.text();
-    const params = new URLSearchParams(text);
+    const params = Object.fromEntries(new URLSearchParams(text));
 
-    const orderId = params.get("m_payment_id");
+    console.log("📦 RAW DATA:", params);
 
-    console.log("PAYFAST ID:", orderId);
+    const receivedSignature = params.signature;
+    const expectedSignature = generateSignature(params, "");
 
-    // 🔍 CHECK IF ORDER EXISTS
-    const check = await supabase
-      .from("orders")
-      .select("*")
-      .eq("order_id", orderId);
+    console.log("🔐 RECEIVED:", receivedSignature);
+    console.log("🔐 EXPECTED:", expectedSignature);
 
-    console.log("FOUND:", check.data);
+    // 🚨 SECURITY CHECK
+    if (receivedSignature !== expectedSignature) {
+      console.log("❌ INVALID SIGNATURE - REJECTED");
+      return NextResponse.json(
+        { error: "Invalid signature" },
+        { status: 403 }
+      );
+    }
+
+    const orderId = params.m_payment_id;
 
     if (!orderId) {
       return NextResponse.json(
-        { error: "Missing orderId" },
+        { error: "Missing order id" },
         { status: 400 }
       );
     }
 
-    // 🔥 UPDATE ORDER STATUS
+    // 🔍 FIND ORDER
+    const { data: found } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("order_id", orderId);
+
+    console.log("FOUND:", found);
+
+    // 🔥 UPDATE ORDER
     const { data, error } = await supabase
       .from("orders")
       .update({ status: "paid" })
@@ -40,8 +76,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
 
   } catch (err: any) {
-    console.error("WEBHOOK ERROR:", err);
-
+    console.error("🔥 WEBHOOK ERROR:", err);
     return NextResponse.json(
       { error: err.message },
       { status: 500 }
