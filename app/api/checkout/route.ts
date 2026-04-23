@@ -1,44 +1,54 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/utils/supabase";
+import { createClient } from "@supabase/supabase-js";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
 
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY! // ⚠️ server-only key
+    );
+
     const orderId = crypto.randomUUID();
 
-    //const body = await req.json();
-
-const { data, error } = await supabase
-  .from("orders")
-  .insert([
-    {
-      id: crypto.randomUUID(),
-      order_id: crypto.randomUUID(),
+    console.log("🧾 CREATING ORDER:", {
+      orderId,
       total: body.total,
-      items: body.items,
-      user_id: body.user_id,   // 🔥 IMPORTANT
-      status: "pending"
-    }
-  ])
-  .select()
-  .single();
+      user_id: body.user_id
+    });
 
-    console.log("SUPABASE INSERT RESULT:", { data, error });
+    const { data, error } = await supabase
+      .from("orders")
+      .insert([
+        {
+          id: orderId,
+          order_id: orderId,
+          total: body.total,
+          items: body.items ?? [],
+          user_id: body.user_id ?? null,
+          status: "pending"
+        }
+      ])
+      .select()
+      .single();
 
     if (error) {
+      console.error("❌ SUPABASE ERROR:", error);
       return NextResponse.json(
         { error: error.message },
         { status: 400 }
       );
     }
 
+    console.log("✅ ORDER CREATED:", data);
+
     return NextResponse.json({
-      data: data // 🔥 must return this exactly
+      data
     });
 
   } catch (err: any) {
-    console.error("CHECKOUT ERROR:", err);
+    console.error("🔥 CHECKOUT ERROR:", err);
     return NextResponse.json(
       { error: err.message },
       { status: 500 }
