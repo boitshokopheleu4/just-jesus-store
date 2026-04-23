@@ -3,47 +3,32 @@ import { supabase } from "@/utils/supabase";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json().catch(() => ({}));
+    console.log("🔥 WEBHOOK HIT");
 
-    const orderId = crypto.randomUUID();
+    const text = await req.text();
+    const params = new URLSearchParams(text);
 
-    const result = await supabase
+    const orderId = params.get("m_payment_id");
+
+    console.log("📦 PayFast ID:", orderId);
+
+    if (!orderId) {
+      return NextResponse.json({ error: "missing id" }, { status: 400 });
+    }
+
+    const { data, error } = await supabase
       .from("orders")
-      .insert({
-        id: orderId,           // internal UUID (primary key)
-        order_id: orderId,     // 🔥 THIS is used by PayFast webhook
-        total: body.amount ?? 100,
-        items: body.items ?? [],
-        status: "pending"
-      })
-      .select()
-      .single();
+      .update({ status: "paid" })
+      .eq("order_id", orderId)
+      .select();
 
-    console.log("SUPABASE RESULT:", result);
+    console.log("✅ UPDATED:", data);
+    console.log("❌ ERROR:", error);
 
-    if (result.error) {
-      return NextResponse.json(
-        { error: result.error.message },
-        { status: 400 }
-      );
-    }
-
-    if (!result.data) {
-      return NextResponse.json(
-        { error: "No data returned from insert" },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json({
-      order: result.data
-    });
+    return NextResponse.json({ success: true });
 
   } catch (err: any) {
-    console.error("SERVER ERROR:", err);
-    return NextResponse.json(
-      { error: err.message },
-      { status: 500 }
-    );
+    console.error(err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
