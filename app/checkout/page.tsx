@@ -17,12 +17,12 @@ export default function CheckoutPage() {
         data: { user }
       } = await supabaseClient.auth.getUser();
 
+      console.log("👤 USER:", user);
+
       if (!user) {
         alert("Please login first");
         return;
       }
-
-      console.log("👤 USER:", user.id);
 
       // 🧾 CREATE ORDER
       const res = await fetch("/api/checkout", {
@@ -53,52 +53,26 @@ export default function CheckoutPage() {
         return;
       }
 
-      // 💳 REQUEST PAYFAST DATA
-     const payRes = await fetch("/api/payfast", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    orderId: order.order_id,
-    amount: order.total
-  })
-});
+      // 💳 CALL PAYFAST BACKEND
+      const payRes = await fetch("/api/payfast", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          orderId: order.order_id,
+          amount: order.total
+        })
+      });
 
-const resData = await payRes.json();
+      const resData = await payRes.json();
 
-console.log("🔥 RAW PAYFAST RESPONSE:", resData);
+      // 🚨 CRITICAL DEBUG
+      console.log("🔥 FULL PAYFAST RESPONSE:", resData);
+      alert(JSON.stringify(resData));
 
-// 🚨 DEBUG CHECK (THIS IS IMPORTANT)
-if (resData.error) {
-  alert(resData.error);
-  return;
-}
-
-const action = resData.action;
-const payload = resData.payload;
-
-if (!action || !payload) {
-  console.error("INVALID PAYFAST RESPONSE:", resData);
-  alert("Missing PayFast data");
-  return;
-}
-
-// 🚀 FORM SUBMIT (REQUIRED BY PAYFAST)
-const form = document.createElement("form");
-form.method = "POST";
-form.action = action;
-
-Object.entries(payload).forEach(([key, value]) => {
-  const input = document.createElement("input");
-  input.type = "hidden";
-  input.name = key;
-  input.value = String(value);
-  form.appendChild(input);
-});
-
-document.body.appendChild(form);
-form.submit();
+      // 🚨 STOP HERE FOR NOW
+      return;
 
     } catch (err) {
       console.error("🔥 Checkout error:", err);

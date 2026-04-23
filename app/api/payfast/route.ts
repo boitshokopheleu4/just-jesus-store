@@ -15,11 +15,6 @@ function generateSignature(data: Record<string, any>) {
 
   return crypto.createHash("md5").update(output).digest("hex");
 }
-console.log("ENV CHECK:", {
-  merchant_id: process.env.PAYFAST_MERCHANT_ID,
-  merchant_key: process.env.PAYFAST_MERCHANT_KEY,
-  baseUrl: process.env.NEXT_PUBLIC_URL
-});
 export async function POST(req: Request) {
   try {
     const { orderId, amount } = await req.json();
@@ -27,6 +22,12 @@ export async function POST(req: Request) {
     const merchant_id = process.env.PAYFAST_MERCHANT_ID;
     const merchant_key = process.env.PAYFAST_MERCHANT_KEY;
     const baseUrl = process.env.NEXT_PUBLIC_URL;
+
+    console.log("ENV CHECK:", {
+  merchant_id: process.env.PAYFAST_MERCHANT_ID,
+  merchant_key: process.env.PAYFAST_MERCHANT_KEY,
+  baseUrl: process.env.NEXT_PUBLIC_URL
+});
 
     // 🚨 HARD CHECK (THIS IS YOUR CURRENT ISSUE)
     if (!merchant_id || !merchant_key || !baseUrl) {
@@ -60,10 +61,11 @@ export async function POST(req: Request) {
     console.log("🔥 PAYFAST PAYLOAD:", payload);
 
     // ✅ ALWAYS RETURN THIS FORMAT
-    return NextResponse.json({
-      action: "https://sandbox.payfast.co.za/eng/process",
-      payload
-    });
+   return NextResponse.json({
+  success: true,
+  action: "https://sandbox.payfast.co.za/eng/process",
+  payload,
+});
 
   } catch (err: any) {
     console.error("🔥 PAYFAST ERROR:", err);
