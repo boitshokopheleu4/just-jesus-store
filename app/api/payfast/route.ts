@@ -30,7 +30,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ BUILD PAYFAST PAYLOAD (THIS IS THE FIX)
+    // ✅ PAYFAST PAYLOAD
     const payload: Record<string, any> = {
       merchant_id,
       merchant_key,
@@ -42,18 +42,17 @@ export async function POST(req: Request) {
       item_name: `Order ${orderId}`,
     };
 
-    // 🔐 ADD SIGNATURE
+    // 🔐 SIGNATURE
     payload.signature = generateSignature(payload);
 
     console.log("PAYFAST PAYLOAD:", payload);
 
-    // 🚨 RETURN CORRECT STRUCTURE
-   {
-  return NextResponse.json({
-  action: "https://sandbox.payfast.co.za/eng/process",
-  payload
-});
-}
+    // 🚨 CORRECT RETURN (NO EXTRA BRACES)
+    return NextResponse.json({
+      action: "https://sandbox.payfast.co.za/eng/process",
+      payload
+    });
+
   } catch (err: any) {
     console.error("PAYFAST ERROR:", err);
     return NextResponse.json(
