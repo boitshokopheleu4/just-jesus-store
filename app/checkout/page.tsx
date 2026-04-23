@@ -1,63 +1,91 @@
 "use client";
 
-export default function Checkout() {
+import { useState } from "react";
+
+export default function CheckoutPage() {
+  const [loading, setLoading] = useState(false);
+
   const handleCheckout = async () => {
     try {
+      setLoading(true);
+
+      console.log("🟡 Starting checkout...");
+
+      // STEP 1: Create order
       const res = await fetch("/api/checkout", {
-        method: "POST"
-      });
-
-      const data = await res.json();
-
-      console.log("Checkout response:", data);
-
-      // 🛑 STOP HERE if order failed
-      if (!data.order) {
-        alert("Checkout failed — check console");
-        console.error("ERROR:", data);
-        return;
-      }
-
-      const order = data.order;
-
-      const pf = await fetch("/api/payfast", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          orderId: order.id,
+          total: 100,
+          items: []
+        })
+      });
+
+      const data = await res.json();
+      console.log("📦 Order response:", data);
+
+      if (!res.ok || !data?.data) {
+        alert("Checkout failed");
+        return;
+      }
+
+      const order = data.data;
+
+      if (!order?.order_id) {
+        console.error("❌ Missing order_id:", order);
+        alert("Order creation failed");
+        return;
+      }
+
+      // STEP 2: PayFast request (THIS is where your line goes)
+      const payRes = await fetch("/api/payfast", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          orderId: order.order_id, // 🔥 THIS IS THE EXACT PLACE
           amount: order.total
         })
       });
 
-      const pfData = await pf.json();
+      const payData = await payRes.json();
+      console.log("💳 PayFast response:", payData);
 
-      console.log("PayFast response:", pfData);
-
-      if (!pfData.redirectUrl) {
-        console.error("PayFast error:", pfData);
+      if (!payRes.ok || !payData?.redirectUrl) {
+        alert("PayFast failed");
         return;
       }
 
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = pfData.redirectUrl;
-
-      Object.entries(pfData.payload).forEach(([k, v]) => {
-        const input = document.createElement("input");
-        input.name = k;
-        input.value = String(v);
-        form.appendChild(input);
-      });
-
-      document.body.appendChild(form);
-      form.submit();
+      // STEP 3: Redirect user to PayFast
+      window.location.href = payData.redirectUrl;
 
     } catch (err) {
-      console.error("Checkout crash:", err);
+      console.error("🔥 Checkout error:", err);
+      alert("Checkout crashed");
+    } finally {
+      setLoading(false);
     }
   };
 
-  return <button onClick={handleCheckout}>Pay Now</button>;
+  return (
+    <div style={{ padding: 20 }}>
+      <h1>Checkout</h1>
+
+      <button
+        onClick={handleCheckout}
+        disabled={loading}
+        style={{
+          padding: "10px 20px",
+          background: loading ? "gray" : "black",
+          color: "white",
+          cursor: "pointer"
+        }}
+      >
+        {loading ? "Processing..." : "Pay Now"}
+      </button>
+    </div>
+  );
 }

@@ -3,42 +3,49 @@ import { supabase } from "@/utils/supabase";
 
 export async function POST(req: Request) {
   try {
-    // 🔥 DEBUG: confirms PayFast hit the endpoint
     console.log("🔥 WEBHOOK HIT");
 
     const text = await req.text();
-    console.log("🔥 RAW WEBHOOK BODY:", text);
-
     const params = new URLSearchParams(text);
 
     const orderId =
       params.get("m_payment_id") ||
       params.get("pf_payment_id");
 
-    console.log("📦 ORDER ID RECEIVED:", orderId);
+    console.log("📦 PAYFAST ORDER ID:", orderId);
 
     if (!orderId) {
-      console.log("❌ Missing order ID");
+      console.log("❌ Missing orderId from PayFast");
       return NextResponse.json(
         { error: "Missing orderId" },
         { status: 400 }
       );
     }
 
-    const { error } = await supabase
+    // 🔥 DEBUG CHECK (IMPORTANT)
+    const check = await supabase
+      .from("orders")
+      .select("*")
+      .eq("order_id", orderId);
+
+    console.log("🔍 ORDER FOUND:", check);
+
+    // 🔥 ACTUAL UPDATE
+    const { data, error } = await supabase
       .from("orders")
       .update({ status: "paid" })
-      .eq("order_id", orderId); // IMPORTANT: matches your DB
+      .eq("order_id", orderId)
+      .select();
 
     if (error) {
-      console.log("❌ Supabase update error:", error);
+      console.error("❌ SUPABASE ERROR:", error);
       return NextResponse.json(
         { error: error.message },
         { status: 500 }
       );
     }
 
-    console.log("✅ ORDER UPDATED TO PAID:", orderId);
+    console.log("✅ UPDATED ROW:", data);
 
     return NextResponse.json({ success: true });
 

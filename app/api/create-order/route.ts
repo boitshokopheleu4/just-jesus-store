@@ -11,8 +11,8 @@ export async function POST(req: Request) {
       .from("orders")
       .insert({
         id: orderId,
-        order_id: orderId,
-        total: body.total ?? 0,
+        order_id: orderId, // 🔥 MUST MATCH PAYFAST
+        total: body.total ?? 100,
         items: body.items ?? [],
         status: "pending"
       })
@@ -20,19 +20,15 @@ export async function POST(req: Request) {
       .single();
 
     if (error) {
-      console.error("SUPABASE ERROR:", error);
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      );
+      console.error("CREATE ORDER ERROR:", error);
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     return NextResponse.json({ data });
 
   } catch (err: any) {
-    console.error("SERVER ERROR:", err);
     return NextResponse.json(
-      { error: err.message || "Server error" },
+      { error: err.message },
       { status: 500 }
     );
   }

@@ -2,106 +2,97 @@
 
 import { useState } from "react";
 
-type CartItem = {
-  name: string;
-  price: number;
-};
-
-export default function Home() {
-  const [cart, setCart] = useState<CartItem[]>([]);
+export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
 
-  const addToCart = (name: string, price: number) => {
-    setCart((prev) => [...prev, { name, price }]);
+  const handleCheckout = async () => {
+    try {
+      setLoading(true);
+
+      console.log("🟡 Starting checkout...");
+
+      // STEP 1: Create order
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          total: 100,
+          items: []
+        })
+      });
+
+      const data = await res.json();
+      console.log("📦 Checkout response:", data);
+
+      if (!res.ok) {
+        console.error("❌ Checkout API failed:", data);
+        alert(data?.error || "Checkout failed");
+        return;
+      }
+
+      const order = data.data;
+
+      if (!order?.order_id) {
+        console.error("❌ Missing order_id:", order);
+        alert("Order creation failed");
+        return;
+      }
+
+      // STEP 2: Send to PayFast
+      const payRes = await fetch("/api/payfast", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          orderId: order.order_id,
+          amount: order.total
+        })
+      });
+
+      const payData = await payRes.json();
+      console.log("💳 PayFast response:", payData);
+
+      if (!payRes.ok) {
+        console.error("❌ PayFast API failed:", payData);
+        alert(payData?.error || "PayFast failed");
+        return;
+      }
+
+      if (!payData?.redirectUrl) {
+        alert("Missing PayFast redirect URL");
+        return;
+      }
+
+      // STEP 3: Redirect to PayFast
+      window.location.href = payData.redirectUrl;
+
+    } catch (err) {
+      console.error("🔥 Checkout error:", err);
+      alert("Checkout crashed — check console");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const total = cart.reduce((sum, item) => sum + item.price, 0);
-
- const checkout = async () => {
-  const res = await fetch("/api/payfast", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      items: cart,
-      total: total,
-      orderId: "JJ-" + Date.now()
-    })
-  });
-
-  const data = await res.json();
-
-  window.location.href = data.url;
-};
-
   return (
-    <main style={{
-      textAlign: "center",
-      fontFamily: "Arial",
-      padding: "60px",
-      background: "#fff",
-      color: "#111"
-    }}>
-      
-      <h1 style={{
-        fontSize: "60px",
-        letterSpacing: "8px",
-        fontWeight: "300"
-      }}>
-        JUST JESUS
-      </h1>
+    <div style={{ padding: 20 }}>
+      <h1>Checkout</h1>
 
-      <p style={{ color: "#777" }}>
-        Pure • Set Apart • For His Glory
-      </p>
-
-      <hr style={{ margin: "40px 0" }} />
-
-      <h2>SHOP</h2>
-
-      <div style={{ marginTop: "30px" }}>
-        <h3>PURE HEART TEE</h3>
-        <p>R250</p>
-        <button onClick={() => addToCart("Pure Heart Tee", 250)}>
-          Add to Cart
-        </button>
-      </div>
-
-      <div style={{ marginTop: "30px" }}>
-        <h3>SET APART HOODIE</h3>
-        <p>R500</p>
-        <button onClick={() => addToCart("Set Apart Hoodie", 500)}>
-          Add to Cart
-        </button>
-      </div>
-
-      <hr style={{ margin: "40px 0" }} />
-
-      <h2>YOUR CART</h2>
-
-      {cart.length === 0 ? (
-        <p>No items yet</p>
-      ) : (
-        <div>
-          {cart.map((item, index) => (
-            <p key={index}>
-              {item.name} - R{item.price}
-            </p>
-          ))}
-
-          <h3>Total: R{total}</h3>
-
-          <button
-            onClick={checkout}
-            disabled={loading}
-            style={{ marginTop: "20px" }}
-          >
-            {loading ? "Processing..." : "Checkout"}
-          </button>
-        </div>
-      )}
-
-    </main>
+      <button
+        onClick={handleCheckout}
+        disabled={loading}
+        style={{
+          padding: "10px 20px",
+          background: loading ? "gray" : "black",
+          color: "white",
+          cursor: "pointer"
+        }}
+      >
+        {loading ? "Processing..." : "Pay Now"}
+      </button>
+    </div>
   );
 }
