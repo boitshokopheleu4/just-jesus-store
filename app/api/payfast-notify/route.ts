@@ -16,11 +16,13 @@ function generateSignature(data: Record<string, any>) {
   // 2. Sort keys alphabetically
   const sortedKeys = Object.keys(pfData).sort();
 
-  // 3. Build string EXACTLY as PayFast expects
+  // 3. Build string with CORRECT encoding
   let output = "";
 
   sortedKeys.forEach((key, index) => {
-    output += `${key}=${pfData[key]}`;
+    const value = encodeURIComponent(pfData[key]).replace(/%20/g, "+"); // 🔥 FIX
+    output += `${key}=${value}`;
+
     if (index !== sortedKeys.length - 1) {
       output += "&";
     }
@@ -28,7 +30,7 @@ function generateSignature(data: Record<string, any>) {
 
   console.log("🔍 STRING TO HASH:", output);
 
-  // 4. Generate MD5 hash
+  // 4. Hash
   return crypto.createHash("md5").update(output).digest("hex");
 }
 
