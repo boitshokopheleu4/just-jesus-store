@@ -2,11 +2,10 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 
 /**
- * Generate PayFast MD5 signature
- * - excludes merchant_key
- * - excludes signature field
- * - sorts keys alphabetically
- * - optionally supports passphrase (NOT required for sandbox)
+ * PayFast signature generator
+ * - excludes signature
+ * - excludes merchant_key (IMPORTANT)
+ * - sorts alphabetically
  */
 function generateSignature(
   data: Record<string, any>,
@@ -19,7 +18,8 @@ function generateSignature(
       data[key] !== "" &&
       data[key] !== null &&
       typeof data[key] !== "undefined" &&
-      key !== "signature"
+      key !== "signature" &&
+      key !== "merchant_key" // ❌ MUST be excluded from signature
     ) {
       pfOutput.push(
         `${key}=${encodeURIComponent(String(data[key]).trim()).replace(
@@ -30,12 +30,10 @@ function generateSignature(
     }
   });
 
-  // MUST sort alphabetically
   pfOutput.sort();
 
   let queryString = pfOutput.join("&");
 
-  // Only append passphrase if it exists
   if (passphrase) {
     queryString += `&passphrase=${encodeURIComponent(passphrase).replace(
       /%20/g,
@@ -51,25 +49,22 @@ export async function POST(req: Request) {
     const { orderId, amount } = await req.json();
 
     const merchant_id = process.env.PAYFAST_MERCHANT_ID;
+    const merchant_key = process.env.PAYFAST_MERCHANT_KEY; // ✅ REQUIRED
     const baseUrl = process.env.NEXT_PUBLIC_URL;
     const passphrase = process.env.PAYFAST_PASSPHRASE || "";
 
-    // 🚨 HARD CHECKS
-    if (!merchant_id || !baseUrl) {
-      console.log("❌ Missing env vars:", {
-        merchant_id,
-        baseUrl,
-      });
-
+    // 🚨 HARD CHECK
+    if (!merchant_id || !merchant_key || !baseUrl) {
       return NextResponse.json(
         { error: "Missing PayFast environment variables" },
         { status: 500 }
       );
     }
 
-    // 💳 PAYFAST PAYLOAD (IMPORTANT: NO merchant_key)
+    // 💳 PAYFAST PAYLOAD (merchant_key MUST be included here)
     const payload: Record<string, any> = {
       merchant_id,
+      merchant_key, // ✅ REQUIRED FOR PAYFAST FORM
       return_url: `${baseUrl}/success`,
       cancel_url: `${baseUrl}/cancel`,
       notify_url: `${baseUrl}/api/payfast-notify`,
@@ -78,18 +73,17 @@ export async function POST(req: Request) {
       item_name: `Order ${orderId}`,
     };
 
-    // 🔐 GENERATE SIGNATURE
+    // 🔐 SIGNATURE (merchant_key excluded automatically)
     payload.signature = generateSignature(payload, passphrase);
 
-    console.log("🔥 PAYFAST PAYLOAD GENERATED:", payload);
+    console.log("🔥 PAYFAST PAYLOAD:", payload);
 
-    // 🚀 RETURN TO FRONTEND
     return NextResponse.json({
       action: "https://sandbox.payfast.co.za/eng/process",
       payload,
     });
   } catch (err: any) {
-    console.error("🔥 PAYFAST ROUTE ERROR:", err);
+    console.error("🔥 PAYFAST ERROR:", err);
 
     return NextResponse.json(
       { error: err.message },
