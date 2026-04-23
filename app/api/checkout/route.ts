@@ -7,17 +7,22 @@ export async function POST(req: Request) {
 
     const orderId = crypto.randomUUID();
 
-    const { data, error } = await supabase
-      .from("orders")
-      .insert({
-        id: orderId,
-        order_id: orderId, // 🔥 CRITICAL
-        total: body.total ?? 100,
-        items: body.items ?? [],
-        status: "pending"
-      })
-      .select()
-      .single();
+    //const body = await req.json();
+
+const { data, error } = await supabase
+  .from("orders")
+  .insert([
+    {
+      id: crypto.randomUUID(),
+      order_id: crypto.randomUUID(),
+      total: body.total,
+      items: body.items,
+      user_id: body.user_id,   // 🔥 IMPORTANT
+      status: "pending"
+    }
+  ])
+  .select()
+  .single();
 
     console.log("SUPABASE INSERT RESULT:", { data, error });
 

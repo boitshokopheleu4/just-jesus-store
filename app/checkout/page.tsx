@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { supabaseClient } from "@/utils/supabaseClient";
 
 export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
@@ -11,7 +12,19 @@ export default function CheckoutPage() {
 
       console.log("🟡 Starting checkout...");
 
-      // STEP 1: Create order
+      // 🔐 GET LOGGED IN USER
+      const {
+        data: { user }
+      } = await supabaseClient.auth.getUser();
+
+      if (!user) {
+        alert("Please login first");
+        return;
+      }
+
+      console.log("👤 USER:", user.id);
+
+      // 🧾 CREATE ORDER
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: {
@@ -19,61 +32,50 @@ export default function CheckoutPage() {
         },
         body: JSON.stringify({
           total: 100,
-          items: []
+          items: [],
+          user_id: user.id
         })
       });
 
       const data = await res.json();
-      console.log("📦 Order response:", data);
+      console.log("📦 ORDER RESPONSE:", data);
 
       if (!res.ok || !data?.data) {
         alert("Checkout failed");
         return;
       }
 
-      const order = data?.data;
+      const order = data.data;
 
-if (!order?.order_id) {
-  console.error("FULL RESPONSE:", data);
-  alert("Missing order_id");
-  return;
-}
+      // ⚠️ SAFETY CHECK
+      if (!order?.order_id) {
+        console.error("Missing order_id:", order);
+        alert("Order creation failed");
+        return;
+      }
 
-      // STEP 2: PayFast request (THIS is where your line goes)
+      // 💳 SEND TO PAYFAST
       const payRes = await fetch("/api/payfast", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          orderId: order.order_id, // 🔥 THIS IS THE EXACT PLACE
+          orderId: order.order_id,
           amount: order.total
         })
       });
 
       const payData = await payRes.json();
-      console.log("💳 PayFast response:", payData);
+      console.log("💳 PAYFAST RESPONSE:", payData);
 
       if (!payRes.ok || !payData?.redirectUrl) {
         alert("PayFast failed");
         return;
       }
 
-      // STEP 3: Redirect user to PayFast
-     const form = document.createElement("form");
-form.method = "POST";
-form.action = payData.redirectUrl;
-
-Object.entries(payData.payload).forEach(([key, value]) => {
-  const input = document.createElement("input");
-  input.type = "hidden";
-  input.name = key;
-  input.value = String(value);
-  form.appendChild(input);
-});
-
-document.body.appendChild(form);
-form.submit();
+      // 🔁 REDIRECT TO PAYFAST
+      window.location.href = payData.redirectUrl;
 
     } catch (err) {
       console.error("🔥 Checkout error:", err);
