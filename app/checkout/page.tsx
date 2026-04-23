@@ -60,7 +60,20 @@ if (!order?.order_id) {
       }
 
       // STEP 3: Redirect user to PayFast
-      window.location.href = payData.redirectUrl;
+     const form = document.createElement("form");
+form.method = "POST";
+form.action = payData.redirectUrl;
+
+Object.entries(payData.payload).forEach(([key, value]) => {
+  const input = document.createElement("input");
+  input.type = "hidden";
+  input.name = key;
+  input.value = String(value);
+  form.appendChild(input);
+});
+
+document.body.appendChild(form);
+form.submit();
 
     } catch (err) {
       console.error("🔥 Checkout error:", err);
