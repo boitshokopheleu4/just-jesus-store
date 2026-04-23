@@ -2,38 +2,24 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/utils/supabase";
 import crypto from "crypto";
 
-// ✅ Correct PayFast signature generator (NO passphrase)
 function generateSignature(data: Record<string, any>) {
-  const pfData: Record<string, string> = {};
-
-  // 1. Remove signature + empty values
-  Object.keys(data).forEach((key) => {
-    if (key !== "signature" && data[key] !== "") {
-      pfData[key] = String(data[key]).trim();
-    }
-  });
-
-  // 2. Sort keys alphabetically
-  const sortedKeys = Object.keys(pfData).sort();
-
-  // 3. Build string with CORRECT encoding
   let output = "";
 
-  sortedKeys.forEach((key, index) => {
-    const value = encodeURIComponent(pfData[key]).replace(/%20/g, "+"); // 🔥 FIX
-    output += `${key}=${value}`;
-
-    if (index !== sortedKeys.length - 1) {
-      output += "&";
+  // 🔥 Use ORIGINAL order (no sorting)
+  Object.keys(data).forEach((key) => {
+    if (key !== "signature" && data[key] !== "") {
+      const value = encodeURIComponent(String(data[key]).trim()).replace(/%20/g, "+");
+      output += `${key}=${value}&`;
     }
   });
+
+  // Remove trailing &
+  output = output.slice(0, -1);
 
   console.log("🔍 STRING TO HASH:", output);
 
-  // 4. Hash
   return crypto.createHash("md5").update(output).digest("hex");
 }
-
 export async function POST(req: Request) {
   try {
     console.log("🔥 WEBHOOK HIT");
