@@ -69,14 +69,15 @@ const resData = await payRes.json();
 
 console.log("PAYFAST RESPONSE:", resData);
 
-const { action, payload } = resData;
+const action = resData.action;
+const payload = resData.payload;
 
 if (!action || !payload) {
   alert("Missing PayFast data");
   return;
 }
 
-// 🚨 FORM SUBMIT (REQUIRED BY PayFast)
+// 🚨 REQUIRED FORM SUBMIT
 const form = document.createElement("form");
 form.method = "POST";
 form.action = action;

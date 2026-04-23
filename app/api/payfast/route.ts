@@ -48,11 +48,12 @@ export async function POST(req: Request) {
     console.log("PAYFAST PAYLOAD:", payload);
 
     // 🚨 RETURN CORRECT STRUCTURE
-    return NextResponse.json({
-      action: "https://sandbox.payfast.co.za/eng/process",
-      payload, // ✅ now it EXISTS in scope
-    });
-
+   {
+  return NextResponse.json({
+  action: "https://sandbox.payfast.co.za/eng/process",
+  payload
+});
+}
   } catch (err: any) {
     console.error("PAYFAST ERROR:", err);
     return NextResponse.json(
