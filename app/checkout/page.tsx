@@ -53,7 +53,7 @@ export default function CheckoutPage() {
         return;
       }
 
-      // 💳 CALL PAYFAST BACKEND
+      // 💳 PAYFAST REQUEST
       const payRes = await fetch("/api/payfast", {
         method: "POST",
         headers: {
@@ -67,12 +67,36 @@ export default function CheckoutPage() {
 
       const resData = await payRes.json();
 
-      // 🚨 CRITICAL DEBUG
-      console.log("🔥 FULL PAYFAST RESPONSE:", resData);
-      alert(JSON.stringify(resData));
+      console.log("🔥 PAYFAST RESPONSE:", resData);
 
-      // 🚨 STOP HERE FOR NOW
-      return;
+      const { action, payload } = resData;
+
+      if (!action || !payload) {
+        alert("Invalid PayFast response");
+        return;
+      }
+
+      // 🚀 BUILD FORM (IMPORTANT FIX)
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = action;
+
+      Object.entries(payload).forEach(([key, value]) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = key;
+        input.value = String(value);
+        form.appendChild(input);
+      });
+
+      document.body.appendChild(form);
+
+      console.log("🚀 Submitting to PayFast...");
+
+      // IMPORTANT: delay prevents Next.js interrupting navigation
+      setTimeout(() => {
+        form.submit();
+      }, 0);
 
     } catch (err) {
       console.error("🔥 Checkout error:", err);
@@ -101,3 +125,4 @@ export default function CheckoutPage() {
     </div>
   );
 }
+  
