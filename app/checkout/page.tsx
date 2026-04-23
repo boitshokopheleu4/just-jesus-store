@@ -54,7 +54,7 @@ export default function CheckoutPage() {
       }
 
       // 💳 REQUEST PAYFAST DATA
-      const payRes = await fetch("/api/payfast", {
+     const payRes = await fetch("/api/payfast", {
   method: "POST",
   headers: {
     "Content-Type": "application/json"
@@ -67,17 +67,24 @@ export default function CheckoutPage() {
 
 const resData = await payRes.json();
 
-console.log("PAYFAST RESPONSE:", resData);
+console.log("🔥 RAW PAYFAST RESPONSE:", resData);
+
+// 🚨 DEBUG CHECK (THIS IS IMPORTANT)
+if (resData.error) {
+  alert(resData.error);
+  return;
+}
 
 const action = resData.action;
 const payload = resData.payload;
 
 if (!action || !payload) {
+  console.error("INVALID PAYFAST RESPONSE:", resData);
   alert("Missing PayFast data");
   return;
 }
 
-// 🚨 REQUIRED FORM SUBMIT
+// 🚀 FORM SUBMIT (REQUIRED BY PAYFAST)
 const form = document.createElement("form");
 form.method = "POST";
 form.action = action;
