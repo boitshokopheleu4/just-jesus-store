@@ -12,7 +12,7 @@ export default function CheckoutPage() {
 
       console.log("🟡 Starting checkout...");
 
-      // 🔐 GET LOGGED IN USER
+      // 🔐 GET USER
       const {
         data: { user }
       } = await supabaseClient.auth.getUser();
@@ -38,6 +38,7 @@ export default function CheckoutPage() {
       });
 
       const data = await res.json();
+
       console.log("📦 ORDER RESPONSE:", data);
 
       if (!res.ok || !data?.data) {
@@ -47,14 +48,12 @@ export default function CheckoutPage() {
 
       const order = data.data;
 
-      // ⚠️ SAFETY CHECK
       if (!order?.order_id) {
-        console.error("Missing order_id:", order);
-        alert("Order creation failed");
+        alert("Missing order_id");
         return;
       }
 
-      // 💳 SEND TO PAYFAST
+      // 💳 REQUEST PAYFAST DATA
       const payRes = await fetch("/api/payfast", {
         method: "POST",
         headers: {
@@ -66,16 +65,30 @@ export default function CheckoutPage() {
         })
       });
 
-      const payData = await payRes.json();
-      console.log("💳 PAYFAST RESPONSE:", payData);
+      const { action, payload } = await payRes.json();
 
-      if (!payRes.ok || !payData?.redirectUrl) {
+      console.log("💳 PAYFAST RESPONSE:", { action, payload });
+
+      if (!action || !payload) {
         alert("PayFast failed");
         return;
       }
 
-      // 🔁 REDIRECT TO PAYFAST
-      window.location.href = payData.redirectUrl;
+      // 🚨 CREATE FORM (MANDATORY FOR PAYFAST)
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = action;
+
+      Object.entries(payload).forEach(([key, value]) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = key;
+        input.value = String(value);
+        form.appendChild(input);
+      });
+
+      document.body.appendChild(form);
+      form.submit();
 
     } catch (err) {
       console.error("🔥 Checkout error:", err);

@@ -1,37 +1,62 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
+
+function generateSignature(data: Record<string, any>) {
+  let output = "";
+
+  Object.keys(data).forEach((key) => {
+    if (data[key] !== "" && data[key] !== null) {
+      output += `${key}=${encodeURIComponent(String(data[key]).trim()).replace(/%20/g, "+")}&`;
+    }
+  });
+
+  output = output.slice(0, -1);
+
+  return crypto.createHash("md5").update(output).digest("hex");
+}
 
 export async function POST(req: Request) {
-  const { orderId, amount } = await req.json();
+  try {
+    const { orderId, amount } = await req.json();
 
-  const merchant_id = process.env.PAYFAST_MERCHANT_ID;
-  const merchant_key = process.env.PAYFAST_MERCHANT_KEY;
-  const baseUrl = process.env.NEXT_PUBLIC_URL;
+    const merchant_id = process.env.PAYFAST_MERCHANT_ID!;
+    const merchant_key = process.env.PAYFAST_MERCHANT_KEY!;
+    const baseUrl = process.env.NEXT_PUBLIC_URL!;
 
-  // 🚨 HARD CHECK (THIS WILL SHOW YOU THE REAL ISSUE)
-  if (!merchant_id || !merchant_key || !baseUrl) {
-    console.log("ENV ERROR:", {
+    // 🚨 ENV CHECK
+    if (!merchant_id || !merchant_key || !baseUrl) {
+      console.log("ENV ERROR");
+      return NextResponse.json({ error: "Missing env vars" }, { status: 500 });
+    }
+
+    // ✅ Build PayFast payload (RAW FORM DATA)
+    const payload: Record<string, any> = {
       merchant_id,
       merchant_key,
-      baseUrl
+      return_url: `${baseUrl}/success`,
+      cancel_url: `${baseUrl}/cancel`,
+      notify_url: `${baseUrl}/api/payfast-notify`,
+      m_payment_id: orderId,
+      amount: Number(amount).toFixed(2),
+      item_name: `Order ${orderId}`,
+    };
+
+    // 🔐 Add signature (important)
+    payload.signature = generateSignature(payload);
+
+    console.log("PAYFAST PAYLOAD:", payload);
+
+    // 🚨 RETURN ONLY FORM DATA (NOT redirectUrl)
+    return NextResponse.json({
+      action: "https://sandbox.payfast.co.za/eng/process",
+      payload,
     });
 
-    return NextResponse.json({
-      error: "Missing environment variables"
-    }, { status: 500 });
+  } catch (err: any) {
+    console.error("PAYFAST ERROR:", err);
+    return NextResponse.json(
+      { error: err.message },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json({
-  redirectUrl: "https://sandbox.payfast.co.za/eng/process",
-  payload: {
-    merchant_id,
-    merchant_key,
-    return_url: `${baseUrl}/success`,
-    cancel_url: `${baseUrl}/cancel`,
-    notify_url: `${process.env.NEXT_PUBLIC_URL}/api/payfast-notify`,
-    m_payment_id: orderId,
-    amount: Number(amount).toFixed(2), // 🔥 CRITICAL FIX
-    item_name: `Order ${orderId}`
-  
-  }
-  });
 }
