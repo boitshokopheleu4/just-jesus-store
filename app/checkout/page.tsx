@@ -55,40 +55,42 @@ export default function CheckoutPage() {
 
       // 💳 REQUEST PAYFAST DATA
       const payRes = await fetch("/api/payfast", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          orderId: order.order_id,
-          amount: order.total
-        })
-      });
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    orderId: order.order_id,
+    amount: order.total
+  })
+});
 
-      const { action, payload } = await payRes.json();
+const resData = await payRes.json();
 
-      console.log("💳 PAYFAST RESPONSE:", { action, payload });
+console.log("PAYFAST RESPONSE:", resData);
 
-      if (!action || !payload) {
-        alert("PayFast failed");
-        return;
-      }
+const { action, payload } = resData;
 
-      // 🚨 CREATE FORM (MANDATORY FOR PAYFAST)
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = action;
+if (!action || !payload) {
+  alert("Missing PayFast data");
+  return;
+}
 
-      Object.entries(payload).forEach(([key, value]) => {
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = key;
-        input.value = String(value);
-        form.appendChild(input);
-      });
+// 🚨 FORM SUBMIT (REQUIRED BY PayFast)
+const form = document.createElement("form");
+form.method = "POST";
+form.action = action;
 
-      document.body.appendChild(form);
-      form.submit();
+Object.entries(payload).forEach(([key, value]) => {
+  const input = document.createElement("input");
+  input.type = "hidden";
+  input.name = key;
+  input.value = String(value);
+  form.appendChild(input);
+});
+
+document.body.appendChild(form);
+form.submit();
 
     } catch (err) {
       console.error("🔥 Checkout error:", err);

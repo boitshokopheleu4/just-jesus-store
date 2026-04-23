@@ -5,7 +5,7 @@ function generateSignature(data: Record<string, any>) {
   let output = "";
 
   Object.keys(data).forEach((key) => {
-    if (data[key] !== "" && data[key] !== null) {
+    if (data[key] !== "" && data[key] !== null && key !== "signature") {
       output += `${key}=${encodeURIComponent(String(data[key]).trim()).replace(/%20/g, "+")}&`;
     }
   });
@@ -23,13 +23,14 @@ export async function POST(req: Request) {
     const merchant_key = process.env.PAYFAST_MERCHANT_KEY!;
     const baseUrl = process.env.NEXT_PUBLIC_URL!;
 
-    // 🚨 ENV CHECK
     if (!merchant_id || !merchant_key || !baseUrl) {
-      console.log("ENV ERROR");
-      return NextResponse.json({ error: "Missing env vars" }, { status: 500 });
+      return NextResponse.json(
+        { error: "Missing env variables" },
+        { status: 500 }
+      );
     }
 
-    // ✅ Build PayFast payload (RAW FORM DATA)
+    // ✅ BUILD PAYFAST PAYLOAD (THIS IS THE FIX)
     const payload: Record<string, any> = {
       merchant_id,
       merchant_key,
@@ -41,15 +42,15 @@ export async function POST(req: Request) {
       item_name: `Order ${orderId}`,
     };
 
-    // 🔐 Add signature (important)
+    // 🔐 ADD SIGNATURE
     payload.signature = generateSignature(payload);
 
     console.log("PAYFAST PAYLOAD:", payload);
 
-    // 🚨 RETURN ONLY FORM DATA (NOT redirectUrl)
+    // 🚨 RETURN CORRECT STRUCTURE
     return NextResponse.json({
       action: "https://sandbox.payfast.co.za/eng/process",
-      payload,
+      payload, // ✅ now it EXISTS in scope
     });
 
   } catch (err: any) {
