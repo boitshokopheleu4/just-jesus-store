@@ -1,69 +1,48 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/utils/supabase";
-import crypto from "crypto";
 
-function generateSignature(data: Record<string, any>) {
-  let output = "";
-
-  // 🔥 Use ORIGINAL order (no sorting)
-  Object.keys(data).forEach((key) => {
-    if (key !== "signature" && data[key] !== "") {
-      const value = encodeURIComponent(String(data[key]).trim()).replace(/%20/g, "+");
-      output += `${key}=${value}&`;
-    }
-  });
-
-  // Remove trailing &
-  output = output.slice(0, -1);
-
-  console.log("🔍 STRING TO HASH:", output);
-
-  return crypto.createHash("md5").update(output).digest("hex");
-}
 export async function POST(req: Request) {
   try {
     console.log("🔥 WEBHOOK HIT");
 
     const text = await req.text();
+    console.log("📦 RAW:", text);
+
     const params = Object.fromEntries(new URLSearchParams(text));
-
-    console.log("📦 RAW DATA:", params);
-
-    const receivedSignature = params.signature;
-
-    // ✅ Generate expected signature
-    const expectedSignature = generateSignature(params);
-
-    console.log("🔐 RECEIVED:", receivedSignature);
-    console.log("🔐 EXPECTED:", expectedSignature);
-
-    // 🚨 SECURITY CHECK
-    if (receivedSignature !== expectedSignature) {
-      console.log("❌ INVALID SIGNATURE - REJECTED");
-      return NextResponse.json(
-        { error: "Invalid signature" },
-        { status: 403 }
-      );
-    }
-
     const orderId = params.m_payment_id;
 
     if (!orderId) {
-      return NextResponse.json(
-        { error: "Missing order id" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing order id" }, { status: 400 });
     }
 
-    // 🔍 FIND ORDER
-    const { data: found } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("order_id", orderId);
+    // 🔥 STEP 1: VERIFY WITH PAYFAST SERVER
+    const verifyRes = await fetch(
+      "https://sandbox.payfast.co.za/eng/query/validate",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: text,
+      }
+    );
 
-    console.log("FOUND:", found);
+    const verifyText = await verifyRes.text();
 
-    // 🔥 UPDATE ORDER STATUS
+    console.log("🔐 PAYFAST VERIFY RESPONSE:", verifyText);
+
+    if (verifyText !== "VALID") {
+      console.log("❌ INVALID PAYMENT");
+      return NextResponse.json({ error: "Invalid payment" }, { status: 403 });
+    }
+
+    // 🔥 STEP 2: CHECK STATUS
+    if (params.payment_status !== "COMPLETE") {
+      console.log("⚠️ Payment not complete");
+      return NextResponse.json({ success: false });
+    }
+
+    // 🔥 STEP 3: UPDATE ORDER
     const { data, error } = await supabase
       .from("orders")
       .update({ status: "paid" })
@@ -77,7 +56,6 @@ export async function POST(req: Request) {
 
   } catch (err: any) {
     console.error("🔥 WEBHOOK ERROR:", err);
-
     return NextResponse.json(
       { error: err.message },
       { status: 500 }
