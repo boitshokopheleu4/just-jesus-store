@@ -15,7 +15,11 @@ function generateSignature(data: Record<string, any>) {
 
   return crypto.createHash("md5").update(output).digest("hex");
 }
-
+console.log("ENV CHECK:", {
+  merchant_id: process.env.PAYFAST_MERCHANT_ID,
+  merchant_key: process.env.PAYFAST_MERCHANT_KEY,
+  baseUrl: process.env.NEXT_PUBLIC_URL
+});
 export async function POST(req: Request) {
   try {
     const { orderId, amount } = await req.json();
