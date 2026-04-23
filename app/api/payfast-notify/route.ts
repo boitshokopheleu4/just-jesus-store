@@ -2,23 +2,34 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/utils/supabase";
 import crypto from "crypto";
 
-function generateSignature(data: Record<string, string>, passphrase = "") {
-  const filtered = Object.keys(data)
-    .filter((key) =>
-      data[key] !== "" &&
-      key !== "signature"
-    )
-    .sort()
-    .map((key) => {
-      return `${key}=${encodeURIComponent(data[key].trim()).replace(/%20/g, "+")}`;
-    })
-    .join("&");
+// ✅ Correct PayFast signature generator (NO passphrase)
+function generateSignature(data: Record<string, any>) {
+  const pfData: Record<string, string> = {};
 
-  const stringToHash = passphrase
-    ? `${filtered}&passphrase=${encodeURIComponent(passphrase).replace(/%20/g, "+")}`
-    : filtered;
+  // 1. Remove signature + empty values
+  Object.keys(data).forEach((key) => {
+    if (key !== "signature" && data[key] !== "") {
+      pfData[key] = String(data[key]).trim();
+    }
+  });
 
-  return crypto.createHash("md5").update(stringToHash).digest("hex");
+  // 2. Sort keys alphabetically
+  const sortedKeys = Object.keys(pfData).sort();
+
+  // 3. Build string EXACTLY as PayFast expects
+  let output = "";
+
+  sortedKeys.forEach((key, index) => {
+    output += `${key}=${pfData[key]}`;
+    if (index !== sortedKeys.length - 1) {
+      output += "&";
+    }
+  });
+
+  console.log("🔍 STRING TO HASH:", output);
+
+  // 4. Generate MD5 hash
+  return crypto.createHash("md5").update(output).digest("hex");
 }
 
 export async function POST(req: Request) {
@@ -31,20 +42,21 @@ export async function POST(req: Request) {
     console.log("📦 RAW DATA:", params);
 
     const receivedSignature = params.signature;
-   const expectedSignature = generateSignature(params, );
 
-console.log("🔐 RECEIVED:", receivedSignature);
-console.log("🔐 EXPECTED:", expectedSignature);
+    // ✅ Generate expected signature
+    const expectedSignature = generateSignature(params);
 
-if (receivedSignature !== expectedSignature) {
-  console.log("❌ INVALID SIGNATURE");
-  return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
-}
+    console.log("🔐 RECEIVED:", receivedSignature);
+    console.log("🔐 EXPECTED:", expectedSignature);
 
     // 🚨 SECURITY CHECK
-   if (process.env.NODE_ENV === "production") {
-  console.log("🔐 Signature check bypassed temporarily for debugging");
-}
+    if (receivedSignature !== expectedSignature) {
+      console.log("❌ INVALID SIGNATURE - REJECTED");
+      return NextResponse.json(
+        { error: "Invalid signature" },
+        { status: 403 }
+      );
+    }
 
     const orderId = params.m_payment_id;
 
@@ -63,7 +75,7 @@ if (receivedSignature !== expectedSignature) {
 
     console.log("FOUND:", found);
 
-    // 🔥 UPDATE ORDER
+    // 🔥 UPDATE ORDER STATUS
     const { data, error } = await supabase
       .from("orders")
       .update({ status: "paid" })
@@ -77,6 +89,7 @@ if (receivedSignature !== expectedSignature) {
 
   } catch (err: any) {
     console.error("🔥 WEBHOOK ERROR:", err);
+
     return NextResponse.json(
       { error: err.message },
       { status: 500 }
