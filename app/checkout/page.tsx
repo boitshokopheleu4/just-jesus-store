@@ -10,14 +10,10 @@ export default function CheckoutPage() {
     try {
       setLoading(true);
 
-      console.log("🟡 Starting checkout...");
-
       // 🔐 GET USER
       const {
-        data: { user }
+        data: { user },
       } = await supabaseClient.auth.getUser();
-
-      console.log("👤 USER:", user);
 
       if (!user) {
         alert("Please login first");
@@ -28,18 +24,16 @@ export default function CheckoutPage() {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           total: 100,
           items: [],
-          user_id: user.id
-        })
+          user_id: user.id,
+        }),
       });
 
       const data = await res.json();
-
-      console.log("📦 ORDER RESPONSE:", data);
 
       if (!res.ok || !data?.data) {
         alert("Checkout failed");
@@ -48,21 +42,16 @@ export default function CheckoutPage() {
 
       const order = data.data;
 
-      if (!order?.order_id) {
-        alert("Missing order_id");
-        return;
-      }
-
-      // 💳 PAYFAST REQUEST
+      // 💳 CALL PAYFAST
       const payRes = await fetch("/api/payfast", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           orderId: order.order_id,
-          amount: order.total
-        })
+          amount: order.total,
+        }),
       });
 
       const resData = await payRes.json();
@@ -76,7 +65,7 @@ export default function CheckoutPage() {
         return;
       }
 
-      // 🚀 BUILD FORM (IMPORTANT FIX)
+      // 🚀 SUBMIT FORM
       const form = document.createElement("form");
       form.method = "POST";
       form.action = action;
@@ -91,16 +80,12 @@ export default function CheckoutPage() {
 
       document.body.appendChild(form);
 
-      console.log("🚀 Submitting to PayFast...");
-
-      // IMPORTANT: delay prevents Next.js interrupting navigation
       setTimeout(() => {
         form.submit();
       }, 0);
-
     } catch (err) {
-      console.error("🔥 Checkout error:", err);
-      alert("Checkout crashed");
+      console.error(err);
+      alert("Checkout failed");
     } finally {
       setLoading(false);
     }
@@ -117,7 +102,6 @@ export default function CheckoutPage() {
           padding: "10px 20px",
           background: loading ? "gray" : "black",
           color: "white",
-          cursor: "pointer"
         }}
       >
         {loading ? "Processing..." : "Pay Now"}
@@ -125,4 +109,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-  

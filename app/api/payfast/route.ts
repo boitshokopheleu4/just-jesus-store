@@ -1,75 +1,63 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 
-/**
- * PAYFAST SIGNATURE RULES:
- * - exclude merchant_key
- * - exclude signature
- * - sort alphabetically
- * - encode correctly
- */
-function generateSignature(
-  data: Record<string, any>,
-  passphrase: string = ""
-) {
-  const pfOutput: string[] = [];
+// ✅ STRICT PAYFAST SIGNATURE FUNCTION
+function generateSignature(data: Record<string, any>, passphrase = "") {
+  const filtered: Record<string, string> = {};
 
-  Object.keys(data).forEach((key) => {
-    const value = data[key];
-
+  for (const key in data) {
     if (
-      value !== "" &&
-      value !== null &&
-      typeof value !== "undefined" &&
+      data[key] !== "" &&
+      data[key] !== null &&
+      typeof data[key] !== "undefined" &&
       key !== "signature" &&
-      key !== "merchant_key" // 🔥 CRITICAL: NEVER INCLUDE THIS
+      key !== "merchant_key"
     ) {
-      pfOutput.push(
-        `${key}=${encodeURIComponent(String(value).trim()).replace(
-          /%20/g,
-          "+"
-        )}`
-      );
+      filtered[key] = String(data[key]).trim();
     }
-  });
+  }
 
-  // MUST sort alphabetically
-  pfOutput.sort();
+  const sortedKeys = Object.keys(filtered).sort();
 
-  let queryString = pfOutput.join("&");
+  let pfString = sortedKeys
+    .map(
+      (key) =>
+        `${key}=${encodeURIComponent(filtered[key]).replace(/%20/g, "+")}`
+    )
+    .join("&");
 
-  // Optional passphrase (sandbox can be empty)
   if (passphrase) {
-    queryString += `&passphrase=${encodeURIComponent(passphrase).replace(
+    pfString += `&passphrase=${encodeURIComponent(passphrase).replace(
       /%20/g,
       "+"
     )}`;
   }
 
-  return crypto.createHash("md5").update(queryString).digest("hex");
+  console.log("🔐 STRING TO HASH:", pfString);
+
+  return crypto.createHash("md5").update(pfString).digest("hex");
 }
 
 export async function POST(req: Request) {
   try {
     const { orderId, amount } = await req.json();
 
-    const merchant_id = process.env.PAYFAST_MERCHANT_ID;
-    const merchant_key = process.env.PAYFAST_MERCHANT_KEY;
-    const baseUrl = process.env.NEXT_PUBLIC_URL;
+    const merchant_id = process.env.PAYFAST_MERCHANT_ID!;
+    const merchant_key = process.env.PAYFAST_MERCHANT_KEY!;
+    const baseUrl = process.env.NEXT_PUBLIC_URL!;
     const passphrase = process.env.PAYFAST_PASSPHRASE || "";
 
-    // 🚨 ENV CHECK
     if (!merchant_id || !merchant_key || !baseUrl) {
       return NextResponse.json(
-        { error: "Missing PayFast environment variables" },
+        { error: "Missing environment variables" },
         { status: 500 }
       );
     }
 
-    // 💳 PAYFAST PAYLOAD
-    const payload: Record<string, any> = {
+    // ✅ PAYLOAD (EXACT STRUCTURE)
+    const payload = {
       merchant_id,
-      merchant_key, // ✅ REQUIRED for PayFast form
+      merchant_key,
       return_url: `${baseUrl}/success`,
       cancel_url: `${baseUrl}/cancel`,
       notify_url: `${baseUrl}/api/payfast-notify`,
@@ -78,17 +66,21 @@ export async function POST(req: Request) {
       item_name: `Order ${orderId}`,
     };
 
-    // 🔐 SIGNATURE (merchant_key automatically excluded)
-    payload.signature = generateSignature(payload, passphrase);
+    // 🔐 SIGNATURE
+    const signature = generateSignature(payload, passphrase);
 
-    console.log("🔥 PAYFAST PAYLOAD GENERATED:", payload);
+    console.log("📦 PAYLOAD:", payload);
+    console.log("🔐 SIGNATURE:", signature);
 
     return NextResponse.json({
       action: "https://sandbox.payfast.co.za/eng/process",
-      payload,
+      payload: {
+        ...payload,
+        signature,
+      },
     });
   } catch (err: any) {
-    console.error("🔥 PAYFAST ROUTE ERROR:", err);
+    console.error("🔥 PAYFAST ERROR:", err);
 
     return NextResponse.json(
       { error: err.message },
