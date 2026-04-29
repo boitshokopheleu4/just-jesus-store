@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { supabaseClient } from "@/utils/supabaseClient";
 
 export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
@@ -11,67 +12,103 @@ export default function CheckoutPage() {
 
       console.log("🟡 Starting checkout...");
 
-      // STEP 1: Create order
+      // 🔐 GET USER
+      const {
+        data: { user },
+      } = await supabaseClient.auth.getUser();
+
+      console.log("👤 USER:", user);
+
+      if (!user) {
+        alert("Please login first");
+        return;
+      }
+
+      // 🧾 CREATE ORDER
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           total: 100,
-          items: []
-        })
+          items: [],
+          user_id: user.id,
+        }),
       });
 
       const data = await res.json();
-      console.log("📦 Checkout response:", data);
 
-      if (!res.ok) {
-        console.error("❌ Checkout API failed:", data);
-        alert(data?.error || "Checkout failed");
+      console.log("📦 ORDER RESPONSE:", data);
+
+      if (!res.ok || !data?.data) {
+        alert("Checkout failed");
         return;
       }
 
       const order = data.data;
 
       if (!order?.order_id) {
-        console.error("❌ Missing order_id:", order);
-        alert("Order creation failed");
+        alert("Missing order_id");
         return;
       }
 
-      // STEP 2: Send to PayFast
+      // 💳 CALL PAYFAST API
       const payRes = await fetch("/api/payfast", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           orderId: order.order_id,
-          amount: order.total
-        })
+          amount: order.total,
+        }),
       });
 
-      const payData = await payRes.json();
-      console.log("💳 PayFast response:", payData);
+      const resData = await payRes.json();
 
-      if (!payRes.ok) {
-        console.error("❌ PayFast API failed:", payData);
-        alert(payData?.error || "PayFast failed");
+      console.log("🔥 PAYFAST RESPONSE:", resData);
+
+      const action = resData.action;
+      const payload = resData.payload;
+
+      // 🚨 FIXES YOUR ERROR
+      if (!action) {
+        alert("No PayFast action URL");
         return;
       }
 
-      if (!payData?.redirectUrl) {
-        alert("Missing PayFast redirect URL");
+      if (!payload) {
+        alert("No PayFast payload");
         return;
       }
 
-      // STEP 3: Redirect to PayFast
-      window.location.href = payData.redirectUrl;
+      // 🚀 CREATE FORM
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = action;
+
+      // append all fields
+      Object.entries(payload).forEach(([key, value]) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = key;
+        input.value = String(value);
+        form.appendChild(input);
+      });
+
+      document.body.appendChild(form);
+
+      console.log("🚀 Redirecting to PayFast...");
+
+      // IMPORTANT: prevent React interference
+      setTimeout(() => {
+        form.submit();
+      }, 0);
 
     } catch (err) {
       console.error("🔥 Checkout error:", err);
-      alert("Checkout crashed — check console");
+      alert("Checkout crashed");
     } finally {
       setLoading(false);
     }
@@ -88,7 +125,7 @@ export default function CheckoutPage() {
           padding: "10px 20px",
           background: loading ? "gray" : "black",
           color: "white",
-          cursor: "pointer"
+          cursor: "pointer",
         }}
       >
         {loading ? "Processing..." : "Pay Now"}
