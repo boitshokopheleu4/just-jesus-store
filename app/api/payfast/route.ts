@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 
-// ✅ STRICT PAYFAST SIGNATURE FUNCTION
 function generateSignature(data: Record<string, any>, passphrase = "") {
   const filtered: Record<string, string> = {};
 
@@ -47,14 +46,24 @@ export async function POST(req: Request) {
     const baseUrl = process.env.NEXT_PUBLIC_URL!;
     const passphrase = process.env.PAYFAST_PASSPHRASE || "";
 
+    // 🚨 ENV DEBUG CHECK (YOU ASKED FOR THIS)
+    console.log("ENV CHECK:", {
+      merchant: process.env.PAYFAST_MERCHANT_ID,
+      key: process.env.PAYFAST_MERCHANT_KEY,
+      url: process.env.NEXT_PUBLIC_URL,
+    });
+
+    // 🚨 FAIL FAST IF ENV IS BROKEN
     if (!merchant_id || !merchant_key || !baseUrl) {
+      console.log("❌ Missing env variables");
+
       return NextResponse.json(
         { error: "Missing environment variables" },
         { status: 500 }
       );
     }
 
-    // ✅ PAYLOAD (EXACT STRUCTURE)
+    // 💳 PAYFAST PAYLOAD
     const payload = {
       merchant_id,
       merchant_key,
@@ -69,7 +78,7 @@ export async function POST(req: Request) {
     // 🔐 SIGNATURE
     const signature = generateSignature(payload, passphrase);
 
-    console.log("📦 PAYLOAD:", payload);
+    console.log("📦 PAYFAST PAYLOAD:", payload);
     console.log("🔐 SIGNATURE:", signature);
 
     return NextResponse.json({
