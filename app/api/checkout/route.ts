@@ -11,8 +11,7 @@ export async function POST(req: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    const orderId = crypto.randomUUID();
-
+   
     // 1. Insert the order into Supabase first
    const orderId = crypto.randomUUID(); // This generates the ID once
 
