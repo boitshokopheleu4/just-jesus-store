@@ -14,24 +14,27 @@ export async function POST(req: Request) {
     const orderId = crypto.randomUUID();
 
     // 1. Insert the order into Supabase first
-    const { data: order, error } = await supabase
-      .from("orders")
-      .insert([
-        {
-          id: orderId,
-          total: body.total,
-          items: body.items ?? [],
-          user_id: body.user_id ?? null,
-          status: "pending"
-        }
-      ])
-      .select()
-      .single();
+   const orderId = crypto.randomUUID(); // This generates the ID once
 
-    if (error) {
-      console.error("❌ SUPABASE ERROR:", error);
-      return NextResponse.json({ error: error.message }, { status: 400 });
+const { data: order, error } = await supabase
+  .from("orders")
+  .insert([
+    {
+      id: orderId,         // Maps the UUID to the 'id' column
+      order_id: orderId,   // Maps the EXACT SAME UUID to the 'order_id' column
+      total: body.total,
+      items: body.items ?? [],
+      user_id: body.user_id ?? null,
+      status: "pending"
     }
+  ])
+  .select()
+  .single();
+
+if (error) {
+  console.error("❌ SUPABASE ERROR:", error);
+  return NextResponse.json({ error: error.message }, { status: 400 });
+}
 
     // 2. Prepare PayFast Data
     // IMPORTANT: The order of these keys must stay consistent
