@@ -1,99 +1,44 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 
-function generateSignature(data: Record<string, any>, passphrase = "") {
-  const filtered: Record<string, string> = {};
-
-  for (const key in data) {
-    if (
-      data[key] !== "" &&
-      data[key] !== null &&
-      typeof data[key] !== "undefined" &&
-      key !== "signature" &&
-      key !== "merchant_key"
-    ) {
-      filtered[key] = String(data[key]).trim();
-    }
-  }
-
-  const sortedKeys = Object.keys(filtered).sort();
-
-  let pfString = sortedKeys
-    .map(
-      (key) =>
-        `${key}=${encodeURIComponent(filtered[key]).replace(/%20/g, "+")}`
-    )
-    .join("&");
-
-  if (passphrase) {
-    pfString += `&passphrase=${encodeURIComponent(passphrase).replace(
-      /%20/g,
-      "+"
-    )}`;
-  }
-
-  console.log("🔐 STRING TO HASH:", pfString);
-
-  return crypto.createHash("md5").update(pfString).digest("hex");
-}
-
 export async function POST(req: Request) {
   try {
     const { orderId, amount } = await req.json();
 
-    const merchant_id = process.env.PAYFAST_MERCHANT_ID!;
-    const merchant_key = process.env.PAYFAST_MERCHANT_KEY!;
-    const baseUrl = process.env.NEXT_PUBLIC_URL!;
-    const passphrase = process.env.PAYFAST_PASSPHRASE || "";
-
-    // 🚨 ENV DEBUG CHECK (YOU ASKED FOR THIS)
-    console.log("ENV CHECK:", {
-      merchant: process.env.PAYFAST_MERCHANT_ID,
-      key: process.env.PAYFAST_MERCHANT_KEY,
-      url: process.env.NEXT_PUBLIC_URL,
-    });
-
-    // 🚨 FAIL FAST IF ENV IS BROKEN
-    if (!merchant_id || !merchant_key || !baseUrl) {
-      console.log("❌ Missing env variables");
-
-      return NextResponse.json(
-        { error: "Missing environment variables" },
-        { status: 500 }
-      );
-    }
-
-    // 💳 PAYFAST PAYLOAD
-    const payload = {
-      merchant_id,
-      merchant_key,
-      return_url: `${baseUrl}/success`,
-      cancel_url: `${baseUrl}/cancel`,
-      notify_url: `${baseUrl}/api/payfast-notify`,
+    const payload: any = {
+      merchant_id: process.env.PAYFAST_MERCHANT_ID,
+      merchant_key: process.env.PAYFAST_MERCHANT_KEY,
+      return_url: `${process.env.NEXT_PUBLIC_URL}/success`,
+      cancel_url: `${process.env.NEXT_PUBLIC_URL}/cancel`,
+      notify_url: `${process.env.NEXT_PUBLIC_URL}/api/webhooks/payfast`,
       m_payment_id: orderId,
-      amount: Number(amount).toFixed(2),
-      item_name: `Order ${orderId}`,
+      amount: parseFloat(amount).toFixed(2), // MUST have 2 decimals
+      item_name: `Order #${orderId}`,
     };
 
-    // 🔐 SIGNATURE
-    const signature = generateSignature(payload, passphrase);
+    // Construct the signature string
+    let pfOutput = "";
+    for (let key in payload) {
+      if (payload.hasOwnProperty(key)) {
+        pfOutput += `${key}=${encodeURIComponent(payload[key].toString().trim()).replace(/%20/g, "+")}&`;
+      }
+    }
 
-    console.log("📦 PAYFAST PAYLOAD:", payload);
-    console.log("🔐 SIGNATURE:", signature);
+    // Remove last ampersand
+    let finalString = pfOutput.slice(0, -1);
+
+    // Add passphrase if it exists in your environment
+    if (process.env.PAYFAST_PASSPHRASE) {
+      finalString += `&passphrase=${encodeURIComponent(process.env.PAYFAST_PASSPHRASE.trim()).replace(/%20/g, "+")}`;
+    }
+
+    const signature = crypto.createHash("md5").update(finalString).digest("hex");
 
     return NextResponse.json({
-      action: "https://sandbox.payfast.co.za/eng/process",
-      payload: {
-        ...payload,
-        signature,
-      },
+      url: "https://sandbox.payfast.co.za/eng/process",
+      payload: { ...payload, signature },
     });
-  } catch (err: any) {
-    console.error("🔥 PAYFAST ERROR:", err);
-
-    return NextResponse.json(
-      { error: err.message },
-      { status: 500 }
-    );
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

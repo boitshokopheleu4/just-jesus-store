@@ -10,86 +10,48 @@ export default function CheckoutPage() {
     try {
       setLoading(true);
 
-      console.log("🟡 Starting checkout...");
-
-      // 🔐 GET USER
-      const {
-        data: { user },
-      } = await supabaseClient.auth.getUser();
-
-      console.log("👤 USER:", user);
+      const { data: { user } } = await supabaseClient.auth.getUser();
 
       if (!user) {
         alert("Please login first");
         return;
       }
 
-      // 🧾 CREATE ORDER
+      // 1. Create the Order in Supabase
       const res = await fetch("/api/checkout", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          total: 100,
+          total: 100.00, // Ensure this is a number
           items: [],
           user_id: user.id,
         }),
       });
 
-      const data = await res.json();
+      const orderData = await res.json();
+      if (!res.ok) throw new Error(orderData.error || "Order creation failed");
 
-      console.log("📦 ORDER RESPONSE:", data);
+      const order = orderData.data;
 
-      if (!res.ok || !data?.data) {
-        alert("Checkout failed");
-        return;
-      }
-
-      const order = data.data;
-
-      if (!order?.order_id) {
-        alert("Missing order_id");
-        return;
-      }
-
-      // 💳 CALL PAYFAST API
+      // 2. Get PayFast Signature & Payload
       const payRes = await fetch("/api/payfast", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orderId: order.order_id,
+          orderId: order.id, // Use the ID returned from Supabase
           amount: order.total,
         }),
       });
 
-      const resData = await payRes.json();
+      const payfastResponse = await payRes.json();
+      if (!payRes.ok) throw new Error(payfastResponse.error || "Signature failed");
 
-      console.log("🔥 PAYFAST RESPONSE:", resData);
-
-      const action = resData.action;
-      const payload = resData.payload;
-
-      // 🚨 FIXES YOUR ERROR
-      if (!action) {
-        alert("No PayFast action URL");
-        return;
-      }
-
-      if (!payload) {
-        alert("No PayFast payload");
-        return;
-      }
-
-      // 🚀 CREATE FORM
+      // 3. Create and Submit Form
       const form = document.createElement("form");
       form.method = "POST";
-      form.action = action;
+      form.action = payfastResponse.url; // Use the URL from backend
 
-      // append all fields
-      Object.entries(payload).forEach(([key, value]) => {
+      Object.entries(payfastResponse.payload).forEach(([key, value]) => {
         const input = document.createElement("input");
         input.type = "hidden";
         input.name = key;
@@ -98,37 +60,25 @@ export default function CheckoutPage() {
       });
 
       document.body.appendChild(form);
+      form.submit();
 
-      console.log("🚀 Redirecting to PayFast...");
-
-      // IMPORTANT: prevent React interference
-      setTimeout(() => {
-        form.submit();
-      }, 0);
-
-    } catch (err) {
-      console.error("🔥 Checkout error:", err);
-      alert("Checkout crashed");
+    } catch (err: any) {
+      console.error("🔥 Error:", err);
+      alert(err.message || "Checkout crashed");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1>Checkout</h1>
-
+    <div className="flex flex-col items-center justify-center min-h-screen">
+      <h1 className="text-3xl font-bold mb-6">JUST JESUS STORE</h1>
       <button
         onClick={handleCheckout}
         disabled={loading}
-        style={{
-          padding: "10px 20px",
-          background: loading ? "gray" : "black",
-          color: "white",
-          cursor: "pointer",
-        }}
+        className="bg-black text-white px-8 py-3 rounded-lg font-bold disabled:bg-gray-400"
       >
-        {loading ? "Processing..." : "Pay Now"}
+        {loading ? "PREPARING..." : "PAY R100.00 NOW"}
       </button>
     </div>
   );
